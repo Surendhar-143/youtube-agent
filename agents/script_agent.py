@@ -49,6 +49,13 @@ def clean_parsed_dict(d: dict) -> dict:
                 cleaned[k] = v_str[0] if v_str else str(v)
             else:
                 cleaned[k] = str(v)
+        elif k == "estimated_seconds":
+            # Shorts prompt returns estimated_seconds — convert to estimated_minutes
+            try:
+                secs = int(v[-1] if isinstance(v, list) else v)
+            except (ValueError, TypeError):
+                secs = 45
+            cleaned["estimated_minutes"] = max(1, round(secs / 60))
         elif k in ("estimated_minutes", "word_count"):
             if isinstance(v, list):
                 try:
@@ -62,6 +69,9 @@ def clean_parsed_dict(d: dict) -> dict:
                     cleaned[k] = 1 if k == "estimated_minutes" else 100
         else:
             cleaned[k] = v
+    # Ensure estimated_minutes always present (default 1 minute for Shorts)
+    if "estimated_minutes" not in cleaned:
+        cleaned["estimated_minutes"] = 1
     return cleaned
 
 class ScriptAgent:
