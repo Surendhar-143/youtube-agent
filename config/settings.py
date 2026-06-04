@@ -85,12 +85,13 @@ class Settings(BaseSettings):
     VIDEO_FALLBACK_COLOR: str = "black"
 
     # Subtitle Formatting & Styles
-    SUBTITLE_CHARS_PER_LINE: int = 40
-    SUBTITLE_MAX_LINES: int = 2
+    SUBTITLE_CHARS_PER_LINE: int = 32
+    SUBTITLE_MAX_LINES: int = 1
     SUBTITLE_FONT_NAME: str = "Arial"
-    SUBTITLE_FONT_SIZE: int = 20
-    SUBTITLE_PRIMARY_COLOR: str = "&H00FFFF"  # Yellow BGR/hex format for ASS
-    SUBTITLE_ALIGNMENT: int = 2  # Bottom Center
+    SUBTITLE_FONT_SIZE: int = 18          # Readable but not dominant
+    SUBTITLE_PRIMARY_COLOR: str = "&H00FFFFFF"  # White — readable on any background
+    SUBTITLE_ALIGNMENT: int = 2           # Bottom center (ASS alignment)
+    SUBTITLE_MARGIN_V: int = 80           # px from the bottom edge
 
     # Asset Source API Keys
     EUROPEANA_API_KEY: str = ""
@@ -111,7 +112,7 @@ class Settings(BaseSettings):
     MOTION_DEFAULT_EFFECT: str = "zoom_in"
 
     # Caption Settings
-    SUBTITLE_WORDS_PER_SEGMENT: int = 3
+    SUBTITLE_WORDS_PER_SEGMENT: int = 2   # 2 words per caption = guaranteed single line
     SUBTITLE_UPPERCASE: bool = True
 
     # AI Image Generation (Disabled — Phase 5 architecture hook only)

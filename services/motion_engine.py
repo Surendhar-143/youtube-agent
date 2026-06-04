@@ -77,26 +77,51 @@ class MotionEngine:
             logger.warning(f"Unknown motion effect '{effect_name}'. Falling back to default '{settings.MOTION_DEFAULT_EFFECT}'.")
             zoompan_filter = list(effects.values())[0]
 
-        # Construct the scale and crop chain
-        # Scale the image first to fill the screen (landscape or portrait aspect ratio) before zoompan.
-        vf_chain = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},{zoompan_filter}"
+        # Build a complex filtergraph:
+        #  1. Split input into background (bg) and foreground (fg)
+        #  2. bg: scale to FILL the 9:16 frame, gaussian blur (looks like a canvas backdrop)
+        #  3. fg: scale to FIT inside the frame (no cropping — preserves full image content)
+        #  4. Overlay fg centered on top of blurred bg
+        #  5. Apply zoompan Ken Burns effect on the composite
+        #
+        # This ensures a 16:9 historical painting is FULLY visible, not cropped.
+        bg_filter = (
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height},"
+            f"gblur=sigma=30"
+        )
+        fg_filter = (
+            f"scale={width}:-2:force_original_aspect_ratio=decrease"
+        )
+        composite_filter = (
+            f"[0:v]split=2[bg][fg];"
+            f"[bg]{bg_filter}[blurred];"
+            f"[fg]{fg_filter}[clear];"
+            f"[blurred][clear]overlay=(W-w)/2:(H-h)/2[composed]"
+        )
 
-        # If motion effects are disabled globally, we just output a static loop of the image
-        if not settings.MOTION_EFFECTS_ENABLED:
-            vf_chain = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
+        if settings.MOTION_EFFECTS_ENABLED:
+            full_filter = f"{composite_filter};[composed]{zoompan_filter}"
+            map_arg = None  # zoompan outputs unnamed final stream, FFmpeg picks it up
+        else:
+            full_filter = composite_filter
+            map_arg = "[composed]"  # explicitly map the composited output
 
+        # Build command using -filter_complex (required for multi-stream compositing)
         cmd = [
             self.ffmpeg_path,
             "-y",
             "-loop", "1",
             "-i", image_abs,
             "-t", str(duration),
-            "-vf", vf_chain,
+            "-filter_complex", full_filter,
             "-c:v", settings.FFMPEG_VIDEO_CODEC,
             "-pix_fmt", settings.FFMPEG_PIXEL_FORMAT,
             "-r", str(fps),
-            output_abs
         ]
+        if map_arg:
+            cmd += ["-map", map_arg]
+        cmd.append(output_abs)
 
         logger.info(f"Applying motion effect '{effect_name}' to '{os.path.basename(image_path)}' for {duration}s...")
         logger.debug(f"FFmpeg command: {' '.join(cmd)}")

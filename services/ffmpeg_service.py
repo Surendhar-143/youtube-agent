@@ -159,6 +159,17 @@ class FFmpegService:
             force_style_parts.append(f"PrimaryColour={settings.SUBTITLE_PRIMARY_COLOR}")
         if settings.SUBTITLE_ALIGNMENT is not None:
             force_style_parts.append(f"Alignment={settings.SUBTITLE_ALIGNMENT}")
+        # Bottom margin so subtitles sit inside the safe area, not at screen edge
+        margin_v = getattr(settings, "SUBTITLE_MARGIN_V", 80)
+        force_style_parts.append(f"MarginV={margin_v}")
+        # Bold for readability on complex image backgrounds
+        force_style_parts.append("Bold=1")
+        # Outline for contrast against any background
+        force_style_parts.append("OutlineColour=&H80000000")
+        force_style_parts.append("Outline=2")
+        force_style_parts.append("Shadow=0")
+        force_style_parts.append("WrapStyle=1")  # No word-wrap — keeps it single line
+
 
         force_style_str = ",".join(force_style_parts)
         if force_style_str:
