@@ -176,6 +176,9 @@ class ScenePlan(Base):
     visual_assets: Mapped[List["VisualAsset"]] = relationship(
         "VisualAsset", back_populates="scene_plan", cascade="all, delete-orphan"
     )
+    asset_downloads: Mapped[List["AssetDownload"]] = relationship(
+        "AssetDownload", back_populates="scene_plan", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<ScenePlan id={self.id} script_id={self.script_id} scene_number={self.scene_number} title={self.title!r}>"
@@ -277,3 +280,39 @@ class AIGeneration(Base):
 
     def __repr__(self) -> str:
         return f"<AIGeneration id={self.id} agent_name={self.agent_name!r} model={self.model!r} success={self.success}>"
+
+
+class AssetDownload(Base):
+    """
+    Metadata representation of a downloaded visual asset file.
+    """
+    __tablename__ = "asset_downloads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    scene_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("scene_plans.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    visual_asset_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("visual_assets.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    asset_type: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. "IMAGE", "VIDEO"
+    source: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. "wikimedia", "europeana", "met_museum", "pexels"
+    search_query: Mapped[str] = mapped_column(String(255), nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    local_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    quality_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    downloaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(50), default="DOWNLOADED", nullable=False) # e.g. "DOWNLOADED", "FAILED"
+
+    # Relationships
+    scene_plan: Mapped["ScenePlan"] = relationship("ScenePlan", back_populates="asset_downloads")
+    visual_asset: Mapped[Optional["VisualAsset"]] = relationship("VisualAsset")
+
+    def __repr__(self) -> str:
+        return f"<AssetDownload id={self.id} scene_id={self.scene_id} source={self.source!r} local_path={self.local_path!r}>"
+

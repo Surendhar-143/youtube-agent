@@ -50,53 +50,41 @@ class SubtitleService:
 
     def chunk_narration_text(self, text: str, duration: float, start_time: float) -> List[Dict[str, Any]]:
         """
-        Chunks narration text of a scene into subtitle entries of max 2 lines and max 80 chars.
-        Distributes scene duration proportionally across text character lengths.
+        Chunks narration text of a scene into subtitle entries of max SUBTITLE_WORDS_PER_SEGMENT words.
+        Distributes scene duration proportionally across word count.
         """
         words = text.split()
         if not words:
             return []
 
-        cues = []
-        current_word_idx = 0
-        while current_word_idx < len(words):
-            lines = []
-            for _ in range(settings.SUBTITLE_MAX_LINES):
-                line = ""
-                while current_word_idx < len(words):
-                    word = words[current_word_idx]
-                    candidate = (line + " " + word).strip()
-                    if len(candidate) <= settings.SUBTITLE_CHARS_PER_LINE:
-                        line = candidate
-                        current_word_idx += 1
-                    else:
-                        break
-                if line:
-                    lines.append(line)
-                else:
-                    break
+        segments = []
+        words_per_segment = getattr(settings, "SUBTITLE_WORDS_PER_SEGMENT", 3)
 
-            if not lines:
-                break
-
-            cue_text = "\n".join(lines)
-
-            cues.append({
-                "text": cue_text,
-                "char_length": len(cue_text.replace('\n', ' '))
+        for i in range(0, len(words), words_per_segment):
+            segment_words = words[i:i + words_per_segment]
+            segment_text = " ".join(segment_words)
+            
+            if getattr(settings, "SUBTITLE_UPPERCASE", True):
+                segment_text = segment_text.upper()
+            
+            # Apply ASS/SSA bold styling code: {\b1}
+            formatted_text = f"{{\\b1}}{segment_text}"
+            
+            segments.append({
+                "text": formatted_text,
+                "word_count": len(segment_words)
             })
 
-        # Distribute timing proportionally
-        total_chars = sum(c["char_length"] for c in cues)
+        total_words = len(words)
         curr_time = start_time
-        for c in cues:
-            fraction = c["char_length"] / total_chars if total_chars > 0 else 1.0 / len(cues)
-            cue_dur = duration * fraction
-            c["start"] = curr_time
-            c["end"] = curr_time + cue_dur
-            curr_time = c["end"]
+        for s in segments:
+            fraction = s["word_count"] / total_words if total_words > 0 else 1.0 / len(segments)
+            seg_dur = duration * fraction
+            s["start"] = curr_time
+            s["end"] = curr_time + seg_dur
+            curr_time = s["end"]
 
-        return cues
+        return segments
 
     def generate_subtitles(self, script_id: int, db: Session) -> SubtitleDocument:
         """

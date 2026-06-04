@@ -92,6 +92,33 @@ class Settings(BaseSettings):
     SUBTITLE_PRIMARY_COLOR: str = "&H00FFFF"  # Yellow BGR/hex format for ASS
     SUBTITLE_ALIGNMENT: int = 2  # Bottom Center
 
+    # Asset Source API Keys
+    EUROPEANA_API_KEY: str = ""
+    PEXELS_API_KEY: str = ""
+    UNSPLASH_ACCESS_KEY: str = ""
+
+    # Asset Acquisition Settings
+    ASSET_MIN_WIDTH: int = 800
+    ASSET_MIN_HEIGHT: int = 600
+    ASSET_DOWNLOAD_TIMEOUT: int = 15
+    ASSET_MAX_RESULTS_PER_QUERY: int = 5
+    ASSET_SEARCH_ENABLED: bool = True
+    ASSET_NICHE_SUBDIR: bool = True   # organize by history/mythology/mystery/horror
+
+    # Motion Engine Settings
+    MOTION_EFFECTS_ENABLED: bool = True
+    MOTION_ZOOM_RATE: float = 0.0015
+    MOTION_DEFAULT_EFFECT: str = "zoom_in"
+
+    # Caption Settings
+    SUBTITLE_WORDS_PER_SEGMENT: int = 3
+    SUBTITLE_UPPERCASE: bool = True
+
+    # AI Image Generation (Disabled — Phase 5 architecture hook only)
+    AI_IMAGE_FALLBACK_ENABLED: bool = False
+    GEMINI_IMAGE_MODEL: str = "imagen-4.0-generate-preview"
+    MAX_AI_IMAGES_PER_VIDEO: int = 5
+
     # Storage Paths
     PATH_SCRIPTS_DIR: str = "generated/scripts"
     PATH_AUDIO_DIR: str = "generated/audio"

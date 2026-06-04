@@ -85,6 +85,12 @@ def run_demo(niche: str) -> Dict[str, Any]:
         report["scene_count"] = scene_count
         report["asset_count"] = asset_count
 
+        # 3.5. Visual Asset Acquisition Pipeline (Phase 5)
+        logger.info("Executing Phase 3.5: Visual Asset Acquisition Pipeline...")
+        from workflows.asset_pipeline import AssetPipeline
+        asset_pipeline = AssetPipeline(db=db)
+        asset_pipeline.run(script_id=script_id, niche=niche)
+
         # 4. Video Rendering Pipeline
         logger.info("Executing Phase 4: Video Assembly Pipeline...")
         video_res = run_video_pipeline(script_id=script_id, db=db)

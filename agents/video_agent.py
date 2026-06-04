@@ -83,19 +83,59 @@ class VideoAgent:
                 raise VideoAgentError(f"No scene plans found for script {script_id}.")
 
             # 5. Build timeline of images and durations
-            images = []
-            durations = []
-            for scene in scenes:
-                # Find visual asset requirement for this scene
-                asset = db.query(VisualAsset).filter(VisualAsset.scene_id == scene.id).first()
-                if asset:
-                    img_path = self._ensure_placeholder_asset(asset.id)
-                else:
-                    # Fallback to scene-level placeholder
-                    img_path = self._ensure_placeholder_scene(scene.id)
-                
-                images.append(img_path)
-                durations.append(scene.estimated_duration)
+            from services.timeline_builder import TimelineBuilder
+            from services.motion_engine import MotionEngine
+
+            timeline_builder = TimelineBuilder()
+            motion_engine = MotionEngine(ffmpeg_path=self.ffmpeg.ffmpeg_path)
+            timeline = timeline_builder.build(script_id, db)
+
+            clip_paths = []
+            temp_clips_dir = os.path.join(self.storage.base_dir, f"temp_clips_{script_id}")
+            os.makedirs(temp_clips_dir, exist_ok=True)
+
+            for entry in timeline.entries:
+                clip_filename = f"clip_scene_{entry.scene_number}_{entry.scene_id}.mp4"
+                clip_path = os.path.join(temp_clips_dir, clip_filename)
+
+                img_path = entry.asset_local_path
+                if entry.is_placeholder:
+                    # Resolve to local fallback path and ensure it's generated
+                    img_path = self._ensure_placeholder_scene(entry.scene_id)
+
+                # Apply motion effect
+                motion_engine.apply_effect(
+                    image_path=img_path,
+                    duration=entry.duration,
+                    effect_name=entry.motion_effect,
+                    output_path=clip_path
+                )
+                clip_paths.append(clip_path)
+
+            # Stitch all individual MP4 clips together
+            concat_txt_path = os.path.join(temp_clips_dir, "concat.txt")
+            with open(concat_txt_path, "w", encoding="utf-8") as f:
+                for clip in clip_paths:
+                    clip_clean = os.path.abspath(clip).replace('\\', '/')
+                    f.write(f"file '{clip_clean}'\n")
+
+            temp_concat_video = os.path.join(temp_clips_dir, "concat_video.mp4")
+
+            cmd_concat = [
+                self.ffmpeg.ffmpeg_path,
+                "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_txt_path,
+                "-c", "copy",
+                temp_concat_video
+            ]
+
+            logger.info("Stitching motion clips...")
+            process = subprocess.run(cmd_concat, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if process.returncode != 0:
+                logger.error(f"FFmpeg concat clips failed: {process.stderr.decode('utf-8', errors='ignore')}")
+                raise RuntimeError(f"FFmpeg concat clips failed: {process.stderr.decode('utf-8', errors='ignore')}")
 
             # Pre-register VideoAsset in RENDERING state
             video_record = self.storage.sync_db_asset(
@@ -108,10 +148,24 @@ class VideoAgent:
                 status="RENDERING"
             )
 
-            # 6. Render raw slideshow video
+            # 6. Merge visuals with narration audio
             temp_raw_mp4 = os.path.join(self.storage.base_dir, f"temp_raw_{script_id}.mp4")
-            logger.info("Stitching visual slideshow with narration audio...")
-            self.ffmpeg.create_slideshow(images, durations, audio_abs_path, temp_raw_mp4)
+            cmd_merge = [
+                self.ffmpeg.ffmpeg_path,
+                "-y",
+                "-i", temp_concat_video,
+                "-i", audio_abs_path,
+                "-c:v", "copy",
+                "-c:a", settings.FFMPEG_AUDIO_CODEC,
+                "-shortest",
+                temp_raw_mp4
+            ]
+
+            logger.info("Merging visuals with narration audio...")
+            process = subprocess.run(cmd_merge, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if process.returncode != 0:
+                logger.error(f"FFmpeg audio merge failed: {process.stderr.decode('utf-8', errors='ignore')}")
+                raise RuntimeError(f"FFmpeg audio merge failed: {process.stderr.decode('utf-8', errors='ignore')}")
 
             # 7. Burn subtitles into final MP4 path
             final_path = self.storage.get_video_path(script_id)
@@ -168,6 +222,15 @@ class VideoAgent:
                     logger.debug(f"Temporary raw file cleaned up: {temp_raw_mp4}")
                 except Exception as ex:
                     logger.warning(f"Failed to clean up temporary raw video: {ex}")
+
+            # Clean up temp clips directory
+            if 'temp_clips_dir' in locals() and os.path.exists(temp_clips_dir):
+                import shutil
+                try:
+                    shutil.rmtree(temp_clips_dir)
+                    logger.debug(f"Temporary clips directory cleaned up: {temp_clips_dir}")
+                except Exception as ex:
+                    logger.warning(f"Failed to clean up temporary clips directory: {ex}")
 
             if opened_session:
                 db.close()
