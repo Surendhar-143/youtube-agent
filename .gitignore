@@ -1,0 +1,25 @@
+# Virtual environment
+venv/
+.venv/
+
+# Local database
+.postgres/
+postgresql_binaries.zip
+
+# Environment files
+.env
+
+# Python caching
+__pycache__/
+*.pyc
+
+# Runtime logs
+logs/
+*.log
+
+# Generated media and scripts
+generated/
+
+# Large binaries and model directories
+.ffmpeg/
+.piper/

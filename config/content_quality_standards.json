@@ -1,0 +1,62 @@
+{
+  "topic_score_min": 8,
+  "script_score_min": 8,
+  "seo_score_min": 8,
+  "scene_count_min": 3,
+  "scene_count_max": 8,
+  "video_score_min": 7,
+  "retention_score_min": 8,
+  "curiosity_score_min": 8,
+  "minimum_topics_generated": 10,
+  "target_categories": ["History", "Mythology", "Mystery", "Horror"],
+  "target_videos_per_category": 10,
+  "script_min_words": 50,
+  "script_max_words": 150,
+  "scoring_dimensions": {
+    "topic": {
+      "curiosity_gap": {"weight": 0.25, "description": "Does the topic create an immediate need-to-know feeling?"},
+      "emotional_impact": {"weight": 0.25, "description": "Does it trigger shock, wonder, fear, mystery, or awe?"},
+      "story_potential": {"weight": 0.25, "description": "Can this become a compelling narrative?"},
+      "virality": {"weight": 0.15, "description": "Would viewers share or recommend this video?"},
+      "ctr_potential": {"weight": 0.10, "description": "Would it receive high click-through rate in YouTube feed?"}
+    },
+    "script": {
+      "hook_strength": {"weight": 0.25, "description": "Does the first 3-5 seconds immediately grab attention?"},
+      "retention_potential": {"weight": 0.20, "description": "Would viewers watch past 50% of the video?"},
+      "storytelling_quality": {"weight": 0.20, "description": "Is it immersive, cinematic, and narrative-driven?"},
+      "suspense": {"weight": 0.20, "description": "Does it create open loops and maintain tension?"},
+      "emotional_impact": {"weight": 0.10, "description": "Does it evoke wonder, fear, mystery, or sadness?"},
+      "value_density": {"weight": 0.05, "description": "Does the script provide interesting, novel information without filler?"}
+    },
+    "seo": {
+      "title_curiosity": {"weight": 0.35, "description": "Does the title create a curiosity gap and compel clicks?"},
+      "title_emotion": {"weight": 0.25, "description": "Does the title trigger an emotional response?"},
+      "tag_coverage": {"weight": 0.20, "description": "Do tags cover broad and specific search terms?"},
+      "description_quality": {"weight": 0.20, "description": "Is the description engaging, keyword-rich, and well-structured?"}
+    },
+    "scene": {
+      "scene_count": {"weight": 0.30, "description": "Is the scene count in the 12-25 ideal range?"},
+      "visual_variety": {"weight": 0.30, "description": "Are visual types diverse and cinematically appropriate?"},
+      "narrative_flow": {"weight": 0.25, "description": "Do scenes follow natural story progression?"},
+      "keyword_quality": {"weight": 0.15, "description": "Are keywords historically accurate and searchable?"}
+    }
+  },
+  "reject_patterns": [
+    "History of ",
+    "Overview of ",
+    "Introduction to ",
+    "Guide to ",
+    "The Roman Empire",
+    "Ancient Egypt",
+    "Greek Mythology"
+  ],
+  "preferred_title_patterns": [
+    "Why X Happened",
+    "The X Nobody Talks About",
+    "The X Even Y Feared",
+    "How X Changed History Forever",
+    "The Untold Story of X",
+    "The X That Shocked the Ancient World",
+    "What Really Happened to X"
+  ]
+}
