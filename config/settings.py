@@ -25,10 +25,12 @@ class Settings(BaseSettings):
     
     # Gemini Settings
     GEMINI_API_KEY: str = ""
+    GEMINI_API_KEY_2: str = ""   # Secondary key — auto-rotated on 429 rate limit
     GEMINI_MODEL: str = "gemini-2.5-flash"
     GEMINI_TIMEOUT: int = 120
     GEMINI_TEMPERATURE: float = 0.7
     GEMINI_MAX_TOKENS: int = 4096
+
 
     # Ollama Settings
     OLLAMA_URL: str = "http://localhost:11434"

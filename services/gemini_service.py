@@ -20,15 +20,51 @@ logger = logging.getLogger("gemini_service")
 class GeminiService:
     """
     Service layer wrapper for Gemini LLM execution using google-genai SDK.
+    Supports automatic API key rotation across up to 2 keys to handle
+    per-key daily rate limits (free tier: 20 requests/day/key).
     """
+
+    # Class-level: shared across all instances in the same process
+    _active_key_index: int = 0
+
     def __init__(self, api_key: Optional[str] = None, default_model: Optional[str] = None):
-        self.api_key = api_key or settings.GEMINI_API_KEY
-        if not self.api_key:
-            raise LLMAuthenticationError("GEMINI_API_KEY is not set")
-            
+        # Build ordered key list: primary key first, secondary key second
+        primary   = api_key or settings.GEMINI_API_KEY
+        secondary = getattr(settings, "GEMINI_API_KEY_2", "") or ""
+
+        self.api_keys: list[str] = [k for k in [primary, secondary] if k]
+        if not self.api_keys:
+            raise LLMAuthenticationError("No GEMINI_API_KEY configured")
+
         self.default_model = default_model or settings.GEMINI_MODEL
-        self.client = genai.Client(api_key=self.api_key)
-        
+        self._init_client()
+
+    def _init_client(self) -> None:
+        """Create a genai.Client using the currently active API key."""
+        key = self.api_keys[GeminiService._active_key_index % len(self.api_keys)]
+        self.api_key  = key
+        self.client   = genai.Client(api_key=key)
+        logger.info(
+            f"GeminiService using key #{GeminiService._active_key_index + 1} "
+            f"(last 6 chars: ...{key[-6:]})"
+        )
+
+    def _rotate_key(self) -> bool:
+        """
+        Advance to the next API key.  Returns True if a new key is available,
+        False if we have already cycled through all keys.
+        """
+        next_index = GeminiService._active_key_index + 1
+        if next_index >= len(self.api_keys):
+            logger.error("All Gemini API keys have been exhausted (rate limited).")
+            return False
+        GeminiService._active_key_index = next_index
+        logger.warning(
+            f"Rotating to Gemini API key #{next_index + 1} after rate limit on key #{next_index}."
+        )
+        self._init_client()
+        return True
+
     def _map_error(self, e: Exception) -> Exception:
         """Map google-genai errors to standard LLM exceptions."""
         if isinstance(e, APIError):
@@ -100,29 +136,37 @@ class GeminiService:
         logger.info(f"Generating content using model '{selected_model}'...")
         logger.info("[TIMING] GeminiService: Before API call")
         start_api = time.time()
-        
-        try:
-            response = self.client.models.generate_content(
-                model=selected_model,
-                contents=prompt,
-                config=config
-            )
-            logger.info(f"[TIMING] GeminiService: After API call (Duration: {time.time() - start_api:.4f}s)")
-            
-            if response.candidates:
-                candidate = response.candidates[0]
-                logger.info(f"Gemini response finish reason: {candidate.finish_reason}")
-                if str(candidate.finish_reason) != "STOP":
-                    logger.warning(f"Gemini response did not finish normally. Finish reason: {candidate.finish_reason}")
-            
-            if not response.text:
-                raise LLMResponseError("Response body missing text content")
-                
-            return response.text
-            
-        except Exception as e:
-            logger.error(f"Failed to generate content: {e}")
-            raise self._map_error(e)
+
+        # Try with current key; rotate once on rate limit
+        for attempt in range(len(self.api_keys)):
+            try:
+                response = self.client.models.generate_content(
+                    model=selected_model,
+                    contents=prompt,
+                    config=config
+                )
+                logger.info(f"[TIMING] GeminiService: After API call (Duration: {time.time() - start_api:.4f}s)")
+
+                if response.candidates:
+                    candidate = response.candidates[0]
+                    logger.info(f"Gemini response finish reason: {candidate.finish_reason}")
+                    if str(candidate.finish_reason) != "STOP":
+                        logger.warning(f"Gemini response did not finish normally. Finish reason: {candidate.finish_reason}")
+
+                if not response.text:
+                    raise LLMResponseError("Response body missing text content")
+
+                return response.text
+
+            except Exception as e:
+                mapped = self._map_error(e)
+                if isinstance(mapped, LLMRateLimitError) and attempt < len(self.api_keys) - 1:
+                    logger.warning(f"Rate limit hit on attempt {attempt + 1}. Trying next API key...")
+                    if self._rotate_key():
+                        start_api = time.time()  # reset timer for new attempt
+                        continue
+                logger.error(f"Failed to generate content: {e}")
+                raise mapped
 
     def generate_json(
         self,
